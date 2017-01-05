@@ -186,9 +186,11 @@ func getConfig(fullMethods bool) (*common.Config, *restful.Container) {
 				Description: "Test API",
 			},
 		},
-		Definitions: &common.OpenAPIDefinitions{
-			"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
-			"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
+		GetDefinitions: func(_ common.ReferenceCallback) map[string]common.OpenAPIDefinition {
+			return &map[string]common.OpenAPIDefinition {
+				"openapi.TestInput":  *TestInput{}.OpenAPIDefinition(),
+				"openapi.TestOutput": *TestOutput{}.OpenAPIDefinition(),
+			}
 		},
 	}, container
 }

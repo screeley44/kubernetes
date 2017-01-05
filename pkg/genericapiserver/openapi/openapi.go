@@ -40,6 +40,7 @@ type openAPI struct {
 	swagger      *spec.Swagger
 	protocolList []string
 	servePath    string
+	definitions  map[string]common.OpenAPIDefinition
 }
 
 // RegisterOpenAPIService registers a handler to provides standard OpenAPI specification.
@@ -79,6 +80,9 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 			return r.Operation, nil, nil
 		}
 	}
+	o.definitions = o.config.GetDefinitions(func (name string) spec.Ref {
+		return spec.MustCreateRef("#/definitions/" + o.getUniqueDefinitionName(name))
+	})
 	if o.config.CommonResponses == nil {
 		o.config.CommonResponses = map[int]spec.Response{}
 	}
@@ -93,12 +97,18 @@ func (o *openAPI) init(webServices []*restful.WebService) error {
 	return nil
 }
 
+
+func (o *openAPI) getUniqueDefinitionName(name string) string {
+	return name[strings.LastIndex(name, "/") + 1:]
+}
+
 func (o *openAPI) buildDefinitionRecursively(name string) error {
-	if _, ok := o.swagger.Definitions[name]; ok {
+	uniqueName := o.getUniqueDefinitionName(name)
+	if _, ok := o.swagger.Definitions[uniqueName]; ok {
 		return nil
 	}
-	if item, ok := (*o.config.Definitions)[name]; ok {
-		o.swagger.Definitions[name] = item.Schema
+	if item, ok := o.definitions[name]; ok {
+		o.swagger.Definitions[uniqueName] = item.Schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {
 				return err
@@ -118,11 +128,11 @@ func (o *openAPI) buildDefinitionForType(sample interface{}) (string, error) {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	name := t.String()
+	name := t.PkgPath() + "." + t.Name()
 	if err := o.buildDefinitionRecursively(name); err != nil {
 		return "", err
 	}
-	return "#/definitions/" + name, nil
+	return "#/definitions/" + o.getUniqueDefinitionName(name), nil
 }
 
 // buildPaths builds OpenAPI paths using go-restful's web services.
